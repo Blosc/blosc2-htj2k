@@ -1,6 +1,20 @@
 /*
- * typedef int (*blosc2_filter_forward_cb)(const uint8_t*, uint8_t*, int32_t, uint8_t, blosc2_cparams*, uint8_t)
- * typedef int (*blosc2_filter_backward_cb)(const uint8_t*, uint8_t*, int32_t, uint8_t, blosc2_dparams*, uint8_t)
+ * typedef int (*blosc2_codec_encoder_cb)(
+ *      const uint8_t *input,
+ *      int32_t input_len,
+ *      uint8_t *output,
+ *      int32_t output_len,
+ *      uint8_t meta,
+ *      blosc2_cparams *cparams,
+ *      const void *chunk)
+ * typedef int (*blosc2_codec_decoder_cb)(
+ *      const uint8_t *input,
+ *      int32_t input_len,
+ *      uint8_t *output,
+ *      int32_t output_len,
+ *      uint8_t meta,
+ *      blosc2_dparams *dparams,
+ *      const void *chunk)
  */
 
 #include <cstring>
@@ -17,10 +31,28 @@
 #define JFNAME "output/teapot.j2c"
 #define OFNAME "output/teapot.ppm"
 
-int htj2k_encode(void) {
+int htj2k_read_image(image_t *image, const char *filename) {
+    std::vector<std::string> filenames = {filename};
+    static open_htj2k::image img(filenames); // FIXME If not static the obj is deallocated on function exit
+
+    uint16_t num_components = img.get_num_components();
+    for (uint16_t c = 0; c < num_components; ++c) {
+        image->buffer[c] = img.get_buf(c);
+        image->components[c].width = img.get_component_width(c);
+        image->components[c].height = img.get_component_height(c);
+        image->components[c].ssiz = img.get_Ssiz_value(c);
+    }
+
+    image->num_components = num_components;
+    image->width = img.get_width();
+    image->height = img.get_height();
+    image->max_bpp = img.get_max_bpp();
+    return 0;
+}
+
+int htj2k_encoder(image_t *image) {
     // Input variables
     const char *ofname = JFNAME;
-    std::vector<std::string> ifnames = {IFNAME};
     uint8_t qfactor = NO_QFACTOR; // 255
     bool isJPH = false;
     uint8_t color_space = 0;
@@ -29,30 +61,29 @@ int htj2k_encode(void) {
 
     // Input buffer
     std::vector<int32_t *> input_buf;
+    std::vector<std::string> ifnames = {IFNAME};
     open_htj2k::image img(ifnames);  // input image
-    uint16_t num_components = img.get_num_components();
-    for (uint16_t c = 0; c < num_components; ++c) {
-        input_buf.push_back(img.get_buf(c));
+    for (uint16_t c = 0; c < image->num_components; ++c) {
+        input_buf.push_back(image->buffer[c]);
     }
 
     // Information of input image
-    uint32_t img_width = img.get_width(), img_height = img.get_height();
     uint32_t img_orig_x = 0, img_orig_y = 0;
     open_htj2k::siz_params siz;
     siz.Rsiz   = 0;
-    siz.Xsiz   = img_width + img_orig_x;
-    siz.Ysiz   = img_height + img_orig_y;
+    siz.Xsiz   = image->width + img_orig_x;
+    siz.Ysiz   = image->height + img_orig_y;
     siz.XOsiz  = img_orig_x;
     siz.YOsiz  = img_orig_y;
-    siz.XTsiz  = img_width;         // Tiles size (X) default to image size
-    siz.YTsiz  = img_height;        // Tiles size (Y) default to image size
+    siz.XTsiz  = image->width;      // Tiles size (X) default to image size
+    siz.YTsiz  = image->height;     // Tiles size (Y) default to image size
     siz.XTOsiz = 0;                 // Origin of first tile (X)
     siz.YTOsiz = 0;                 // Origin of first tile (Y)
-    siz.Csiz   = num_components;
+    siz.Csiz   = image->num_components;
     for (uint16_t c = 0; c < siz.Csiz; ++c) {
-        siz.Ssiz.push_back(img.get_Ssiz_value(c));
-        auto compw = img.get_component_width(c);
-        auto comph = img.get_component_height(c);
+        siz.Ssiz.push_back(image->components[c].ssiz);
+        auto compw = image->components[c].width;
+        auto comph = image->components[c].height;
         siz.XRsiz.push_back(static_cast<unsigned char>(((siz.Xsiz - siz.XOsiz) + compw - 1) / compw));
         siz.YRsiz.push_back(static_cast<unsigned char>(((siz.Ysiz - siz.YOsiz) + comph - 1) / comph));
     }
@@ -78,10 +109,11 @@ int htj2k_encode(void) {
     qcd.number_of_guardbits = 1;        // Number of guard bits (0-8)
     qcd.base_step           = 0.0;      // Base step size for quantization (0.0 - 2.0)
     if (qcd.base_step == 0.0) {
-        qcd.base_step = 1.0f / static_cast<float>(1 << img.get_max_bpp());
+        qcd.base_step = 1.0f / static_cast<float>(1 << image->max_bpp);
     }
 
-    // Create encoder
+    // Encode
+    //std::vector<uint8_t> outbuf;
     for (int i = 0; i < num_iterations; ++i) {
         open_htj2k::openhtj2k_encoder encoder(
             ofname,                 // output filename
@@ -103,10 +135,14 @@ int htj2k_encode(void) {
         }
     }
 
+    // Save file
+//  FILE *fp = fopen(ofname, "wb");
+//  fwrite(outbuf.data(), sizeof(uint8_t), outbuf.size(), fp);
+
     return EXIT_SUCCESS;
 }
 
-int htj2k_decode(void) {
+int htj2k_decoder(void) {
     // Input variables
     const char *ifname = JFNAME;
     const char *ofname = OFNAME;
