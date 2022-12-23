@@ -23,16 +23,14 @@ typedef int (*blosc2_codec_decoder_cb)(
 #include <cstring>
 #include <encoder.hpp>
 #include <decoder.hpp>
-#include "include/dec_utils.hpp"
-#include "include/blosc2_htj2k.h"
+#include <dec_utils.hpp>
+#include "blosc2_htj2k.h"
 
 
 #define NO_QFACTOR 0xFF
 
-#define IFNAME "input/teapot.ppm"
 //#define JFNAME "output/teapot.jphc"
 #define JFNAME "output/teapot.j2c"
-#define OFNAME "output/teapot.ppm"
 
 int htj2k_read_image(image_t *image, const char *filename)
 {
@@ -183,14 +181,20 @@ int htj2k_encoder(
     return size;
 }
 
-int htj2k_decoder(const uint8_t *input, int32_t input_len)
+int htj2k_decoder(
+    const uint8_t *input,
+    int32_t input_len,
+    uint8_t *output,
+    int32_t output_len,
+    image_t *image
+)
 {
     // Input variables
-    const char *ofname = OFNAME;
     uint8_t reduce_NL = 0;          // Number of DWT resolution reduction (0-32)
     uint32_t num_threads = 1;
     int32_t num_iterations = 1;     // Number of iterations (1-INT32_MAX)
 
+    // Decode
     std::vector<int32_t *> buf;
     std::vector<uint32_t> img_width;
     std::vector<uint32_t> img_height;
@@ -199,6 +203,8 @@ int htj2k_decoder(const uint8_t *input, int32_t input_len)
     for (int i = 0; i < num_iterations; ++i) {
         // Create decoder
         open_htj2k::openhtj2k_decoder decoder(input, input_len, reduce_NL, num_threads);
+
+        // Clear vectors
         for (auto &j : buf) {
             delete[] j;
         }
@@ -216,8 +222,66 @@ int htj2k_decoder(const uint8_t *input, int32_t input_len)
         }
     }
 
-    const char *ofname_ext = strrchr(ofname, '.');
-    write_ppm(ofname, ofname_ext, buf, img_width, img_height, img_depth, img_signed);
+    // Transform to a C structure
+    image->buffer = NULL;
+    image->buffer_len = 0;
+    image->num_components = buf.size();
+    for (uint16_t c = 0; c < image->num_components; c++) {
+        uint32_t width = img_width[c];
+        uint32_t height = img_height[c];
+        uint32_t size = width * height * sizeof(int32_t);
+        image->components[c].width = width;
+        image->components[c].height = height;
+        image->components[c].depth = img_depth[c];
+        image->components[c].sign = img_signed[c];
+        image->buffer_len += size;
+    }
 
-    return EXIT_SUCCESS;
+    if (image->buffer_len > output_len) {
+        return 0;
+    }
+
+    // Copy data to contiguous array
+    uint8_t *dest = output;
+    for (uint16_t c = 0; c < image->num_components; c++) {
+        uint32_t width = img_width[c];
+        uint32_t height = img_height[c];
+        uint32_t size = width * height * sizeof(int32_t);
+        memcpy(dest, buf[c], size);
+        dest += size;
+    }
+
+    return image->buffer_len;
+}
+
+int htj2k_write_ppm(
+    uint8_t *input,
+    int32_t input_len,
+    image_t *image,
+    char *filename
+)
+{
+    std::vector<int32_t *> buf;
+    std::vector<uint32_t> img_width;
+    std::vector<uint32_t> img_height;
+    std::vector<uint8_t> img_depth;
+    std::vector<bool> img_signed;
+
+    uint8_t *dest = input;
+    for (uint16_t c = 0; c < image->num_components; c++) {
+        uint32_t width = image->components[c].width;
+        uint32_t height = image->components[c].height;
+        uint32_t size = width * height * sizeof(int32_t);
+        img_width.push_back(width);
+        img_height.push_back(height);
+        img_depth.push_back(image->components[c].depth);
+        img_signed.push_back(image->components[c].sign);
+        buf.push_back((int32_t*)dest);
+        dest += size;
+    }
+
+    char *ext = strrchr(filename, '.');
+    write_ppm(filename, ext, buf, img_width, img_height, img_depth, img_signed);
+
+    return 0;
 }
