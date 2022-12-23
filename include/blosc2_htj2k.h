@@ -12,7 +12,8 @@ typedef struct {
 } component_t;
 
 typedef struct {
-    int32_t *buffer[3];
+    uint8_t *buffer;
+    size_t buffer_len;
     uint16_t num_components;
     uint32_t width;
     uint32_t height;
@@ -21,8 +22,15 @@ typedef struct {
 } image_t;
 
 int htj2k_read_image(image_t *image, const char *filename);
-int htj2k_encoder(image_t *image);
-int htj2k_decoder(void);
+void htj2k_free_image(image_t *image);
+int htj2k_encoder(
+    const uint8_t *input,
+    int32_t input_len,
+    uint8_t *output,
+    int32_t output_len,
+    image_t *image
+);
+int htj2k_decoder(const uint8_t *input, int32_t input_len);
 
 #ifdef __cplusplus
 }

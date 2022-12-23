@@ -1,27 +1,30 @@
 /*
- * typedef int (*blosc2_codec_encoder_cb)(
- *      const uint8_t *input,
- *      int32_t input_len,
- *      uint8_t *output,
- *      int32_t output_len,
- *      uint8_t meta,
- *      blosc2_cparams *cparams,
- *      const void *chunk)
- * typedef int (*blosc2_codec_decoder_cb)(
- *      const uint8_t *input,
- *      int32_t input_len,
- *      uint8_t *output,
- *      int32_t output_len,
- *      uint8_t meta,
- *      blosc2_dparams *dparams,
- *      const void *chunk)
- */
+
+typedef int (*blosc2_codec_encoder_cb)(
+     const uint8_t *input,
+     int32_t input_len,
+     uint8_t *output,
+     int32_t output_len,
+     uint8_t meta,
+     blosc2_cparams *cparams,
+     const void *chunk)
+
+typedef int (*blosc2_codec_decoder_cb)(
+     const uint8_t *input,
+     int32_t input_len,
+     uint8_t *output,
+     int32_t output_len,
+     uint8_t meta,
+     blosc2_dparams *dparams,
+     const void *chunk)
+
+*/
 
 #include <cstring>
 #include <encoder.hpp>
 #include <decoder.hpp>
 #include "include/dec_utils.hpp"
-#include "include/wrapper.h"
+#include "include/blosc2_htj2k.h"
 
 
 #define NO_QFACTOR 0xFF
@@ -31,26 +34,58 @@
 #define JFNAME "output/teapot.j2c"
 #define OFNAME "output/teapot.ppm"
 
-int htj2k_read_image(image_t *image, const char *filename) {
+int htj2k_read_image(image_t *image, const char *filename)
+{
+    // Parse image
     std::vector<std::string> filenames = {filename};
-    static open_htj2k::image img(filenames); // FIXME If not static the obj is deallocated on function exit
+    open_htj2k::image img(filenames);
 
-    uint16_t num_components = img.get_num_components();
-    for (uint16_t c = 0; c < num_components; ++c) {
-        image->buffer[c] = img.get_buf(c);
-        image->components[c].width = img.get_component_width(c);
-        image->components[c].height = img.get_component_height(c);
-        image->components[c].ssiz = img.get_Ssiz_value(c);
-    }
-
-    image->num_components = num_components;
+    // Load general information
+    image->num_components = img.get_num_components();
     image->width = img.get_width();
     image->height = img.get_height();
     image->max_bpp = img.get_max_bpp();
+
+    // Load component information
+    image->buffer_len = 0;
+    for (uint16_t c = 0; c < image->num_components; ++c) {
+        uint32_t width = img.get_component_width(c);
+        uint32_t height = img.get_component_height(c);
+        uint32_t size = width * height * sizeof(int32_t);
+        image->components[c].width = width;
+        image->components[c].height = height;
+        image->components[c].ssiz = img.get_Ssiz_value(c);
+        image->buffer_len += size;
+    }
+
+    // Copy data to contiguous array
+    image->buffer = (uint8_t*)malloc(image->buffer_len);
+    uint8_t *dest = image->buffer;
+    for (uint16_t c = 0; c < image->num_components; ++c) {
+        uint32_t width = image->components[c].width;
+        uint32_t height = image->components[c].height;
+        uint32_t size = width * height * sizeof(int32_t);
+        memcpy(dest, img.get_buf(c), size);
+        dest += size;
+    }
+
     return 0;
 }
 
-int htj2k_encoder(image_t *image) {
+void htj2k_free_image(image_t *image)
+{
+    free(image->buffer);
+    image->buffer = NULL;
+}
+
+int htj2k_encoder(
+    const uint8_t *input,
+    int32_t input_len,
+    uint8_t *output,
+    int32_t output_len,
+    image_t *image
+)
+{
     // Input variables
     const char *ofname = JFNAME;
     uint8_t qfactor = NO_QFACTOR; // 255
@@ -60,11 +95,14 @@ int htj2k_encoder(image_t *image) {
     int32_t num_iterations = 1;     // Number of iterations (1-INT32_MAX)
 
     // Input buffer
+    const uint8_t *ptr = input;
     std::vector<int32_t *> input_buf;
-    std::vector<std::string> ifnames = {IFNAME};
-    open_htj2k::image img(ifnames);  // input image
     for (uint16_t c = 0; c < image->num_components; ++c) {
-        input_buf.push_back(image->buffer[c]);
+        input_buf.push_back((int32_t*)ptr);
+        uint32_t width = image->components[c].width;
+        uint32_t height = image->components[c].height;
+        uint32_t size = width * height * sizeof(int32_t);
+        ptr += size;
     }
 
     // Information of input image
@@ -113,7 +151,7 @@ int htj2k_encoder(image_t *image) {
     }
 
     // Encode
-    //std::vector<uint8_t> outbuf;
+    std::vector<uint8_t> outbuf;
     for (int i = 0; i < num_iterations; ++i) {
         open_htj2k::openhtj2k_encoder encoder(
             ofname,                 // output filename
@@ -127,7 +165,7 @@ int htj2k_encoder(image_t *image) {
             num_threads             // num_threads
         );
 
-        //encoder.set_output_buffer(outbuf);
+        encoder.set_output_buffer(outbuf);
         try {
             encoder.invoke(); // Returns size_t total_size
         } catch (std::exception &exc) {
@@ -136,15 +174,18 @@ int htj2k_encoder(image_t *image) {
     }
 
     // Save file
-//  FILE *fp = fopen(ofname, "wb");
-//  fwrite(outbuf.data(), sizeof(uint8_t), outbuf.size(), fp);
+    int size = outbuf.size();
+    if (size > output_len) {
+        return 0;
+    }
+    memcpy(output, outbuf.data(), size);
 
-    return EXIT_SUCCESS;
+    return size;
 }
 
-int htj2k_decoder(void) {
+int htj2k_decoder(const uint8_t *input, int32_t input_len)
+{
     // Input variables
-    const char *ifname = JFNAME;
     const char *ofname = OFNAME;
     uint8_t reduce_NL = 0;          // Number of DWT resolution reduction (0-32)
     uint32_t num_threads = 1;
@@ -157,7 +198,7 @@ int htj2k_decoder(void) {
     std::vector<bool> img_signed;
     for (int i = 0; i < num_iterations; ++i) {
         // Create decoder
-        open_htj2k::openhtj2k_decoder decoder(ifname, reduce_NL, num_threads);
+        open_htj2k::openhtj2k_decoder decoder(input, input_len, reduce_NL, num_threads);
         for (auto &j : buf) {
             delete[] j;
         }
