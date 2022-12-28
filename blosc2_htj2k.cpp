@@ -24,6 +24,7 @@ typedef int (*blosc2_codec_decoder_cb)(
 #include <encoder.hpp>
 #include <decoder.hpp>
 #include <dec_utils.hpp>
+#include <caterva.h>
 #include "blosc2_htj2k.h"
 
 
@@ -50,9 +51,12 @@ int htj2k_read_image(image_t *image, const char *filename)
         uint32_t width = img.get_component_width(c);
         uint32_t height = img.get_component_height(c);
         uint32_t size = width * height * sizeof(int32_t);
+        uint8_t ssiz = img.get_Ssiz_value(c);
         image->components[c].width = width;
         image->components[c].height = height;
-        image->components[c].ssiz = img.get_Ssiz_value(c);
+        image->components[c].ssiz = ssiz;
+        image->components[c].depth = (ssiz & 0x7F) + 1;
+        image->components[c].sign = ssiz >> 7;
         image->buffer_len += size;
     }
 
@@ -81,9 +85,36 @@ int htj2k_encoder(
     int32_t input_len,
     uint8_t *output,
     int32_t output_len,
-    image_t *image
+    uint8_t meta,
+    blosc2_cparams* cparams,
+    const void* chunk
 )
 {
+    uint8_t *content;
+    int32_t content_len;
+    int error = blosc2_meta_get((blosc2_schunk*)cparams->schunk, "caterva", &content, &content_len);
+
+    int8_t ndim;
+    int64_t shape[3];
+    int32_t chunkshape[3];
+    int32_t blockshape[3];
+    error = caterva_deserialize_meta(content, content_len, &ndim, shape, chunkshape, blockshape);
+
+    image_t tmp;
+    tmp.num_components = blockshape[0];
+    tmp.width = blockshape[1];
+    tmp.height= blockshape[2];
+    tmp.max_bpp = 8;
+    for (int i = 0; i < tmp.num_components; i++) {
+        tmp.components[i].width = tmp.width;
+        tmp.components[i].height = tmp.height;
+        tmp.components[i].depth = tmp.max_bpp;
+        tmp.components[i].sign = 0;
+        tmp.components[i].ssiz = tmp.max_bpp; // FIXME sign
+    }
+
+    image_t *image = &tmp;
+
     // Input variables
     const char *ofname = JFNAME;
     uint8_t qfactor = NO_QFACTOR; // 255
@@ -186,7 +217,9 @@ int htj2k_decoder(
     int32_t input_len,
     uint8_t *output,
     int32_t output_len,
-    image_t *image
+    uint8_t meta,
+    blosc2_dparams *dparams,
+    const void* chunk
 )
 {
     // Input variables
@@ -223,27 +256,29 @@ int htj2k_decoder(
     }
 
     // Transform to a C structure
-    image->buffer = NULL;
-    image->buffer_len = 0;
-    image->num_components = buf.size();
-    for (uint16_t c = 0; c < image->num_components; c++) {
+    int num_components = buf.size();
+    int buffer_len = 0;
+
+//  image->buffer = NULL;
+    for (uint16_t c = 0; c < num_components; c++) {
         uint32_t width = img_width[c];
         uint32_t height = img_height[c];
         uint32_t size = width * height * sizeof(int32_t);
-        image->components[c].width = width;
-        image->components[c].height = height;
-        image->components[c].depth = img_depth[c];
-        image->components[c].sign = img_signed[c];
-        image->buffer_len += size;
+        //uint32_t size = width * height * sizeof(int32_t);
+//      image->components[c].width = width;
+//      image->components[c].height = height;
+//      image->components[c].depth = img_depth[c];
+//      image->components[c].sign = img_signed[c];
+        buffer_len += size;
     }
 
-    if (image->buffer_len > output_len) {
+    if (buffer_len > output_len) {
         return 0;
     }
 
     // Copy data to contiguous array
     uint8_t *dest = output;
-    for (uint16_t c = 0; c < image->num_components; c++) {
+    for (uint16_t c = 0; c < num_components; c++) {
         uint32_t width = img_width[c];
         uint32_t height = img_height[c];
         uint32_t size = width * height * sizeof(int32_t);
@@ -251,7 +286,7 @@ int htj2k_decoder(
         dest += size;
     }
 
-    return image->buffer_len;
+    return buffer_len;
 }
 
 int htj2k_write_ppm(

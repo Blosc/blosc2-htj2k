@@ -7,12 +7,14 @@ extern "C" {
 #include <stdbool.h>
 #endif
 
+#include <blosc2.h>
+
 typedef struct {
     uint32_t width;
     uint32_t height;
-    uint8_t depth;
-    bool sign;
-    uint8_t ssiz; // component's bit depth and sign (combines the 2 above)
+    uint8_t depth; // default 8
+    bool sign;     // default 0
+    uint8_t ssiz;  // component's bit depth and sign (combines the 2 above)
 } component_t;
 
 typedef struct {
@@ -35,11 +37,13 @@ void htj2k_free_image(
 );
 
 int htj2k_encoder(
-    const uint8_t *input,
+    const uint8_t* input,
     int32_t input_len,
-    uint8_t *output,
+    uint8_t* output,
     int32_t output_len,
-    image_t *image
+    uint8_t meta,
+    blosc2_cparams* cparams,
+    const void* chunk
 );
 
 int htj2k_decoder(
@@ -47,7 +51,9 @@ int htj2k_decoder(
     int32_t input_len,
     uint8_t *output,
     int32_t output_len,
-    image_t *image
+    uint8_t meta,
+    blosc2_dparams *dparams,
+    const void* chunk
 );
 
 int htj2k_write_ppm(

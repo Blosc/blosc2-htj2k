@@ -1,66 +1,89 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include <caterva.h>
 #include "blosc2_htj2k.h"
 
 
 int main(void) {
+    blosc2_init();
+
     const char *ifname = "input/teapot.ppm";
+    char *ofname = "output/teapot.ppm";
+
+    //const char *ifname = "input/pexels-artem-saranin-1496373.ppm";
+    //char *ofname = "output/pexels-artem-saranin-1496373.ppm";
+
     image_t image;
-    uint8_t *tmp = NULL;
-    int tmp_len = 0;
-    uint8_t *out = NULL;
-    int out_len = 0;
-    int ret = 0;
 
     // Read source file(s)
     printf("Read\t");
     if (htj2k_read_image(&image, ifname)) {
-        goto error;
+        return -1;
     }
     printf("OK\n");
 
-    // Encode
-    printf("Encode\t");
-    tmp = malloc(image.buffer_len);
-    tmp_len = htj2k_encoder(image.buffer, image.buffer_len, tmp, image.buffer_len, &image);
-    if (tmp_len == 0) {
-        printf("NOOP\n");
-        goto exit;
-    }
-    else if (tmp_len < 0) {
-        goto error;
-    }
+    // Register codec
+    printf("Register\t");
+    blosc2_codec udcodec;
+    udcodec.compcode = 244;
+    udcodec.compver = 1;
+    udcodec.complib = 1;
+    udcodec.compname = "htj2k";
+    udcodec.encoder = htj2k_encoder;
+    udcodec.decoder = htj2k_decoder;
+    int error = blosc2_register_codec(&udcodec);
     printf("OK\n");
-    htj2k_free_image(&image); // Free image's allocated memory
 
-    // Decode
-    printf("Decode\t");
-    out = malloc(image.buffer_len);
-    out_len = htj2k_decoder(tmp, tmp_len, out, image.buffer_len, &image);
-    if (out_len == 0) {
-        printf("Not enough space\n");
-        goto error;
+    printf("Blosc version info: %s (%s)\n", blosc2_get_version_string(), BLOSC2_VERSION_DATE);
+
+    int8_t ndim = 3;
+    int64_t shape[] = {3, image.width, image.height};
+    int32_t chunkshape[] = {3, image.width, image.height};
+    int32_t blockshape[] = {3, 400, 600};
+    uint8_t itemsize = 4;
+
+    caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
+    cfg.compcodec = 244;
+    for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
+        cfg.filters[i] = 0;
     }
-    else if (out_len < 0) {
-        goto error;
+
+    caterva_ctx_t *ctx;
+    caterva_ctx_new(&cfg, &ctx);
+
+    caterva_params_t params = {0};
+    params.ndim = ndim;
+    params.itemsize = itemsize;
+    for (int i = 0; i < ndim; ++i) {
+        params.shape[i] = shape[i];
     }
-    printf("OK\n");
+
+    caterva_storage_t storage = {0};
+    for (int i = 0; i < ndim; ++i) {
+        storage.chunkshape[i] = chunkshape[i];
+        storage.blockshape[i] = blockshape[i];
+    }
+
+    caterva_array_t *arr;
+    CATERVA_ERROR(caterva_from_buffer(ctx, image.buffer, image.buffer_len, &params, &storage, &arr));
+    caterva_save(ctx, arr, "output/caterva.cat");
+
+    uint8_t *buffer;
+    uint64_t buffer_size = itemsize;
+    for (int i = 0; i < arr->ndim; ++i) {
+        buffer_size *= arr->shape[i];
+    }
+    buffer = malloc(buffer_size);
+
+    CATERVA_ERROR(caterva_to_buffer(ctx, arr, buffer, buffer_size));
 
     // Write output file
     printf("Write\t");
-    htj2k_write_ppm(out, out_len, &image, "output/teapot.ppm");
+    htj2k_write_ppm(buffer, buffer_size, &image, ofname);
     printf("OK\n");
 
-    htj2k_free_image(&image); // Free image's allocated memory
-    goto exit;
-
-error:
-    printf("ERROR\n");
-    ret = -1;
-
-exit:
-    free(tmp);
-    free(out);
-    return ret;
+    blosc2_destroy();
+    return 0;
 }
