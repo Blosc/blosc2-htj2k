@@ -5,9 +5,16 @@
 
 # Commands
 
-    encoder -i input/teapot.ppm -o output/teapot.j2c
-    encoder -i input/teapot.ppm -o output/teapot.jphc
-    decoder -i output/teapot.jphc -o output/teapot.ppm
+Build (including OpenHTJ2K):
+
+    export BLOSC=/absolute/path/to/blosc2
+    make build
+
+Then a number of commands from OpenHTJ2K will be available:
+
+    ./bin/open_htj2k_enc -i input/teapot.ppm -o output/teapot.j2c
+    ./bin/open_htj2k_enc -i input/teapot.ppm -o output/teapot.jphc
+    ./bin/open_htj2k_dec -i output/teapot.jphc -o output/teapot.ppm
 
 # Fileformats
 
@@ -21,21 +28,3 @@ JPEG 2000 (J2K-1 block coder)
 * Part 15 HT .JHC or .JPHC code stream
 
 We use .JPHC
-
-# Patch (blosc2)
-
-```
-diff --git plugins/plugin_utils.h plugins/plugin_utils.h
-index 15f54d1b..fbf8ab69 100644
---- plugins/plugin_utils.h
-+++ plugins/plugin_utils.h
-@@ -4,7 +4,7 @@
-   License: BSD 3-Clause (see LICENSE.txt)
- */
-
--void swap_store(void *dest, const void *pa, int size);
-+BLOSC_EXPORT void swap_store(void *dest, const void *pa, int size);
-
- int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
-                          int32_t *chunkshape, int32_t *blockshape);
-```

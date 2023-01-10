@@ -2,7 +2,7 @@
 *.o
 *.so
 
+/.envrc
 /a.out
-/decoder/
-/encoder/
+/bin/
 /output/
