@@ -59,7 +59,7 @@ int main(void) {
 
     b2nd_array_t *arr;
     BLOSC_ERROR(b2nd_from_buffer(ctx, &arr, image.buffer, image.buffer_len));
-    b2nd_save(arr, "output/b2nd.cat");
+    b2nd_save(arr, "output/b2nd.b2nd");
 
     uint8_t *buffer;
     uint64_t buffer_size = itemsize;
