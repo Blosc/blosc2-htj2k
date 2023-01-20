@@ -24,7 +24,7 @@ typedef int (*blosc2_codec_decoder_cb)(
 #include <encoder.hpp>
 #include <decoder.hpp>
 #include <dec_utils.hpp>
-#include <caterva.h>
+#include <b2nd.h>
 #include "blosc2_htj2k.h"
 
 
@@ -92,13 +92,13 @@ int htj2k_encoder(
 {
     uint8_t *content;
     int32_t content_len;
-    int error = blosc2_meta_get((blosc2_schunk*)cparams->schunk, "caterva", &content, &content_len);
+    int error = blosc2_meta_get((blosc2_schunk*)cparams->schunk, "b2nd", &content, &content_len);
 
     int8_t ndim;
     int64_t shape[3];
     int32_t chunkshape[3];
     int32_t blockshape[3];
-    error = caterva_deserialize_meta(content, content_len, &ndim, shape, chunkshape, blockshape);
+    error = b2nd_deserialize_meta(content, content_len, &ndim, shape, chunkshape, blockshape);
 
     image_t tmp;
     tmp.num_components = blockshape[0];

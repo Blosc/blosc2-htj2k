@@ -10,7 +10,7 @@ CXX = g++
 build: openhtj2k
 	$(CXX) -c -o blosc2_htj2k.o blosc2_htj2k.cpp -fPIC\
 		-I$(BLOSC)/include\
-		-I$(BLOSC)/blosc\
+		-I$(BLOSC)\
 		-I$(HTJ2K)/source/core/interface\
 		-I$(HTJ2K)/source/apps/decoder
 	$(CXX) -shared -o libblosc2_htj2k.so blosc2_htj2k.o\
@@ -19,7 +19,7 @@ build: openhtj2k
 		-Wl,-rpath $(HTJ2K)/build/bin
 	$(CC) main.c\
 		-I$(BLOSC)/include\
-		-I$(BLOSC)/blosc\
+		-I$(BLOSC)\
 		-L$(BLOSC)/build/blosc -lblosc2\
 		-L. -lblosc2_htj2k\
 		-Wl,-rpath .

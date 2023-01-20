@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <caterva.h>
+#include <b2nd.h>
+#include <blosc/context.h>
 #include "blosc2_htj2k.h"
 
 
@@ -44,31 +45,21 @@ int main(void) {
     int32_t blockshape[] = {3, 400, 600};
     uint8_t itemsize = 4;
 
-    caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-    cfg.compcodec = 244;
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.compcode = 244;
+    cparams.typesize = itemsize;
     for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
-        cfg.filters[i] = 0;
+        cparams.filters[i] = 0;
     }
 
-    caterva_ctx_t *ctx;
-    caterva_ctx_new(&cfg, &ctx);
+    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+    blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
 
-    caterva_params_t params = {0};
-    params.ndim = ndim;
-    params.itemsize = itemsize;
-    for (int i = 0; i < ndim; ++i) {
-        params.shape[i] = shape[i];
-    }
+    b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL, 0);
 
-    caterva_storage_t storage = {0};
-    for (int i = 0; i < ndim; ++i) {
-        storage.chunkshape[i] = chunkshape[i];
-        storage.blockshape[i] = blockshape[i];
-    }
-
-    caterva_array_t *arr;
-    CATERVA_ERROR(caterva_from_buffer(ctx, image.buffer, image.buffer_len, &params, &storage, &arr));
-    caterva_save(ctx, arr, "output/caterva.cat");
+    b2nd_array_t *arr;
+    BLOSC_ERROR(b2nd_from_buffer(ctx, &arr, image.buffer, image.buffer_len));
+    b2nd_save(arr, "output/b2nd.cat");
 
     uint8_t *buffer;
     uint64_t buffer_size = itemsize;
@@ -77,7 +68,7 @@ int main(void) {
     }
     buffer = malloc(buffer_size);
 
-    CATERVA_ERROR(caterva_to_buffer(ctx, arr, buffer, buffer_size));
+    BLOSC_ERROR(b2nd_to_buffer(arr, buffer, buffer_size));
 
     // Write output file
     printf("Write\t");
