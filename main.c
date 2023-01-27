@@ -58,7 +58,7 @@ int main(void) {
     b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL, 0);
 
     b2nd_array_t *arr;
-    BLOSC_ERROR(b2nd_from_buffer(ctx, &arr, image.buffer, image.buffer_len));
+    BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, image.buffer, image.buffer_len));
     b2nd_save(arr, "output/b2nd.b2nd");
 
     uint8_t *buffer;
@@ -68,7 +68,7 @@ int main(void) {
     }
     buffer = malloc(buffer_size);
 
-    BLOSC_ERROR(b2nd_to_buffer(arr, buffer, buffer_size));
+    BLOSC_ERROR(b2nd_to_cbuffer(arr, buffer, buffer_size));
 
     // Write output file
     printf("Write\t");
