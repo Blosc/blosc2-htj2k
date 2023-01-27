@@ -2,10 +2,10 @@
 
 HTJ2K = contrib/OpenHTJ2K
 
-#CC = clang
-#CXX = clang++
-CC = gcc
-CXX = g++
+CC = clang
+CXX = clang++ --std=c++17
+#CC = gcc
+#CXX = g++
 
 build: openhtj2k
 	$(CXX) -c -o blosc2_htj2k.o blosc2_htj2k.cpp -fPIC\
