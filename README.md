@@ -31,7 +31,7 @@ Then a number of commands from OpenHTJ2K will be available:
 
 Using the OpenHTJ2K plugin is possible via the main program.  For Mac:
 
-    faltet@Mac-mini-de-Francesc ~/b/blosc2-htj2k (main)> DYLD_LIBRARY_PATH=$BLOSC/build/blosc ./a.out                                 (base)
+    DYLD_LIBRARY_PATH=$BLOSC/build/blosc ./a.out
     Read	OK
     Register	OK
     Blosc version info: 2.6.2.dev ($Date:: 2022-12-15 #$)
@@ -39,7 +39,7 @@ Using the OpenHTJ2K plugin is possible via the main program.  For Mac:
 
 and the roundtrip file should appear in the output directory:
 
-    faltet@Mac-mini-de-Francesc ~/b/blosc2-htj2k (main)> ls -l output/                                                                     (base)
+    ls -l output
     total 141216
     -rw-r--r--@ 1 faltet  staff  72000017 Jan 27 13:17 pexels-artem-saranin-1496373.ppm
     -rw-r--r--  1 faltet  staff     45605 Jan 27 12:21 teapot.j2c
