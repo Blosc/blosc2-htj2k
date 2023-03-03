@@ -25,15 +25,15 @@ typedef struct {
     uint8_t max_bpp;
     uint16_t num_components;
     component_t components[3];
-} image_t;
+} htj2k_image_t;
 
 int htj2k_read_image(
-    image_t *image,
+    htj2k_image_t *image,
     const char *filename
 );
 
 void htj2k_free_image(
-    image_t *image
+    htj2k_image_t *image
 );
 
 int htj2k_encoder(
@@ -59,7 +59,7 @@ int htj2k_decoder(
 int htj2k_write_ppm(
     uint8_t *input,
     int32_t input_len,
-    image_t *image,
+    htj2k_image_t *image,
     char *filename
 );
 

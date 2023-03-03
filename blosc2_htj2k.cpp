@@ -33,7 +33,7 @@ typedef int (*blosc2_codec_decoder_cb)(
 //#define JFNAME "output/teapot.jphc"
 #define JFNAME "output/teapot.j2c"
 
-int htj2k_read_image(image_t *image, const char *filename)
+int htj2k_read_image(htj2k_image_t *image, const char *filename)
 {
     // Parse image
     std::vector<std::string> filenames = {filename};
@@ -74,7 +74,7 @@ int htj2k_read_image(image_t *image, const char *filename)
     return 0;
 }
 
-void htj2k_free_image(image_t *image)
+void htj2k_free_image(htj2k_image_t *image)
 {
     free(image->buffer);
     image->buffer = NULL;
@@ -98,9 +98,12 @@ int htj2k_encoder(
     int64_t shape[3];
     int32_t chunkshape[3];
     int32_t blockshape[3];
-    error = b2nd_deserialize_meta(content, content_len, &ndim, shape, chunkshape, blockshape);
 
-    image_t tmp;
+    char *dtype;
+    int8_t dtype_format;
+    error = b2nd_deserialize_meta(content, content_len, &ndim, shape, chunkshape, blockshape, &dtype, &dtype_format);
+
+    htj2k_image_t tmp;
     tmp.num_components = blockshape[0];
     tmp.width = blockshape[1];
     tmp.height= blockshape[2];
@@ -113,7 +116,7 @@ int htj2k_encoder(
         tmp.components[i].ssiz = tmp.max_bpp; // FIXME sign
     }
 
-    image_t *image = &tmp;
+    htj2k_image_t *image = &tmp;
 
     // Input variables
     const char *ofname = JFNAME;
@@ -292,7 +295,7 @@ int htj2k_decoder(
 int htj2k_write_ppm(
     uint8_t *input,
     int32_t input_len,
-    image_t *image,
+    htj2k_image_t *image,
     char *filename
 )
 {

@@ -16,7 +16,7 @@ int main(void) {
     //const char *ifname = "input/pexels-artem-saranin-1496373.ppm";
     //char *ofname = "output/pexels-artem-saranin-1496373.ppm";
 
-    image_t image;
+    htj2k_image_t image;
 
     // Read source file(s)
     printf("Read\t");
@@ -55,7 +55,9 @@ int main(void) {
     blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
 
-    b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL, 0);
+    b2nd_context_t *ctx = b2nd_create_ctx(
+        &b2_storage, ndim, shape, chunkshape, blockshape, NULL, 0, NULL, 0
+    );
 
     b2nd_array_t *arr;
     BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, image.buffer, image.buffer_len));
