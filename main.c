@@ -51,6 +51,10 @@ int main(void) {
     for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
         cparams.filters[i] = 0;
     }
+    htj2k_params_t codec_params = {
+        .image = &image
+    };
+    cparams.codec_params = &codec_params;
 
     blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};

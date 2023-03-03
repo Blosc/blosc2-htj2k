@@ -27,6 +27,10 @@ typedef struct {
     component_t components[3];
 } htj2k_image_t;
 
+typedef struct {
+    htj2k_image_t *image;
+} htj2k_params_t;
+
 int htj2k_read_image(
     htj2k_image_t *image,
     const char *filename

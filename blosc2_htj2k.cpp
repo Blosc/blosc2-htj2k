@@ -90,30 +90,35 @@ int htj2k_encoder(
     const void* chunk
 )
 {
+    // Read b2nd metadata
     uint8_t *content;
     int32_t content_len;
     int error = blosc2_meta_get((blosc2_schunk*)cparams->schunk, "b2nd", &content, &content_len);
-
     int8_t ndim;
     int64_t shape[3];
     int32_t chunkshape[3];
     int32_t blockshape[3];
-
     char *dtype;
     int8_t dtype_format;
-    error = b2nd_deserialize_meta(content, content_len, &ndim, shape, chunkshape, blockshape, &dtype, &dtype_format);
+    error = b2nd_deserialize_meta(content, content_len, &ndim, shape, chunkshape, blockshape,
+                                  &dtype, &dtype_format);
 
+    // Get the source image data
+    htj2k_params_t *codec_params = (htj2k_params_t*)(cparams->codec_params);
+    htj2k_image_t *src_image = codec_params->image;
+
+    // Build the image data for the block to be compressed
     htj2k_image_t tmp;
     tmp.num_components = blockshape[0];
     tmp.width = blockshape[1];
     tmp.height= blockshape[2];
-    tmp.max_bpp = 8;
+    tmp.max_bpp = src_image->max_bpp;;
     for (int i = 0; i < tmp.num_components; i++) {
         tmp.components[i].width = tmp.width;
         tmp.components[i].height = tmp.height;
         tmp.components[i].depth = tmp.max_bpp;
-        tmp.components[i].sign = 0;
-        tmp.components[i].ssiz = tmp.max_bpp; // FIXME sign
+        tmp.components[i].sign = 0; // FIXME sign
+        tmp.components[i].ssiz = tmp.max_bpp;
     }
 
     htj2k_image_t *image = &tmp;
