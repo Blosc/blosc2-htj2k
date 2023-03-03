@@ -176,7 +176,7 @@ int htj2k_encoder(
     cod.use_color_trafo               = 1;      // Use RGB->YCbCr color space conversion (1 or 0)
     cod.dwt_levels                    = 5;      // Number of DWT decomposition (0-32)
     cod.codeblock_style               = 0x040;
-    cod.transformation                = 0;      // 0:lossy 1:lossless
+    cod.transformation                = codec_params->transformation;
 
     // Parameters related to QCD marker
     open_htj2k::qcd_params qcd{};

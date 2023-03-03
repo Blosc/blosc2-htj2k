@@ -29,6 +29,7 @@ typedef struct {
 
 typedef struct {
     htj2k_image_t *image;
+    uint8_t transformation; // 0:lossy 1:lossless
 } htj2k_params_t;
 
 int htj2k_read_image(

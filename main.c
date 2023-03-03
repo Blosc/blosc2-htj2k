@@ -52,7 +52,8 @@ int main(void) {
         cparams.filters[i] = 0;
     }
     htj2k_params_t codec_params = {
-        .image = &image
+        .image = &image,
+        .transformation = 1, // 0:lossy 1:lossless
     };
     cparams.codec_params = &codec_params;
 
